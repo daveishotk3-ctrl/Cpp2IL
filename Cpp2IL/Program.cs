@@ -562,6 +562,9 @@ internal static class Program
 
         // if(string.IsNullOrEmpty(options.OutputFormatId))      // throw new SoftException("No output format specified, so nothing to do!");
 
+        if (options.JustGiveMeDlls && !options.OutputFormatIds.Any())
+            options.OutputFormatIds = new[] { "dummydll" };
+
         if (options.OutputFormatIds.Any() == true)
         {
             try
