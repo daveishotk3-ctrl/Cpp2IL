@@ -66,8 +66,6 @@ public static class MetadataResolver
     /// </summary>
     private static void ResolveMetadataUsages(MethodAnalysisContext method)
     {
-        var libContext = method.AppContext.LibCpp2IlContext;
-
         foreach (var instruction in method.ControlFlowGraph!.Instructions)
         {
             if (instruction.OpCode != OpCode.Move)
@@ -86,41 +84,56 @@ public static class MetadataResolver
             if (address == 0)
                 continue;
 
-            // String literal.
-            var stringLiteral = libContext.GetLiteralByAddress(address);
-            if (stringLiteral != null)
-            {
-                instruction.SetOperand(1, new StringLiteral(stringLiteral));
-                continue;
-            }
-
-            // Type metadata usage (Il2CppType* / Il2CppClass*).
-            if (method.DeclaringType is { } declaringType)
-            {
-                var typeGlobal = libContext.GetTypeGlobalByAddress(address);
-                if (typeGlobal != null)
-                {
-                    instruction.SetOperand(1, declaringType.AppContext.ResolveIl2CppType(typeGlobal));
-                    continue;
-                }
-            }
-
-            // Method metadata usage (MethodInfo*). On metadata v27+ GetMethodGlobalByAddress can return
-            // any global, so confirm it is actually a method before resolving - the resolver's switch
-            // throws on other usage kinds.
-            var methodUsage = libContext.GetMethodGlobalByAddress(address);
-            if (methodUsage?.Type is MetadataUsageType.MethodDef or MetadataUsageType.MethodRef
-                && method.AppContext.ResolveContextForMethod(methodUsage) is { DeclaringType: { } methodDeclaringType } methodContext)
-            {
-                instruction.SetOperand(1, new RuntimeMethodInfoAnalysisContext(methodContext, methodDeclaringType.DeclaringAssembly));
-                continue;
-            }
-
-            // Field metadata usage (FieldInfo*), e.g. the RuntimeFieldHandle passed to InitializeArray.
-            if (libContext.GetRawFieldGlobalByAddress(address) is { Type: MetadataUsageType.FieldInfo } fieldUsage
-                && method.AppContext.ResolveContextForField(fieldUsage.AsField()) is { DeclaringType.DeclaringAssembly: { } fieldAssembly } fieldContext)
-                instruction.SetOperand(1, new RuntimeFieldInfoAnalysisContext(fieldContext, fieldAssembly));
+            if (TryResolveMetadataGlobal(method, instruction, address))
+                GlobalResolutionDiagnostics.RecordResolved(method.AppContext);
+            else
+                GlobalResolutionDiagnostics.RecordUnresolved(method.AppContext, address);
         }
+    }
+
+    private static bool TryResolveMetadataGlobal(MethodAnalysisContext method, Instruction instruction, ulong address)
+    {
+        var libContext = method.AppContext.LibCpp2IlContext;
+
+        // String literal.
+        var stringLiteral = libContext.GetLiteralByAddress(address);
+        if (stringLiteral != null)
+        {
+            instruction.SetOperand(1, new StringLiteral(stringLiteral));
+            return true;
+        }
+
+        // Type metadata usage (Il2CppType* / Il2CppClass*).
+        if (method.DeclaringType is { } declaringType)
+        {
+            var typeGlobal = libContext.GetTypeGlobalByAddress(address);
+            if (typeGlobal != null)
+            {
+                instruction.SetOperand(1, declaringType.AppContext.ResolveIl2CppType(typeGlobal));
+                return true;
+            }
+        }
+
+        // Method metadata usage (MethodInfo*). On metadata v27+ GetMethodGlobalByAddress can return
+        // any global, so confirm it is actually a method before resolving - the resolver's switch
+        // throws on other usage kinds.
+        var methodUsage = libContext.GetMethodGlobalByAddress(address);
+        if (methodUsage?.Type is MetadataUsageType.MethodDef or MetadataUsageType.MethodRef
+            && method.AppContext.ResolveContextForMethod(methodUsage) is { DeclaringType: { } methodDeclaringType } methodContext)
+        {
+            instruction.SetOperand(1, new RuntimeMethodInfoAnalysisContext(methodContext, methodDeclaringType.DeclaringAssembly));
+            return true;
+        }
+
+        // Field metadata usage (FieldInfo*), e.g. the RuntimeFieldHandle passed to InitializeArray.
+        if (libContext.GetRawFieldGlobalByAddress(address) is { Type: MetadataUsageType.FieldInfo } fieldUsage
+            && method.AppContext.ResolveContextForField(fieldUsage.AsField()) is { DeclaringType.DeclaringAssembly: { } fieldAssembly } fieldContext)
+        {
+            instruction.SetOperand(1, new RuntimeFieldInfoAnalysisContext(fieldContext, fieldAssembly));
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

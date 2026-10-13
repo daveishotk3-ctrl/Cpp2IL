@@ -8,6 +8,7 @@ using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.CIL;
+using Cpp2IL.Core.Analysis;
 using Cpp2IL.Core.Extensions;
 using Cpp2IL.Core.Graphs;
 using Cpp2IL.Core.Logging;
@@ -40,7 +41,13 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
         if (KeepDecompilerIssues)
             IlGenerator.InjectHelpersType(context);
 
-        return base.BuildAssemblies(context);
+        GlobalResolutionDiagnostics.Enable(context);
+
+        var assemblies = base.BuildAssemblies(context);
+
+        GlobalResolutionDiagnostics.Report(context);
+
+        return assemblies;
     }
 
     protected override void FillMethodBody(MethodDefinition methodDefinition, MethodAnalysisContext methodContext)
