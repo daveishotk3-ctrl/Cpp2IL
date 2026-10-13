@@ -562,8 +562,14 @@ internal static class Program
 
         // if(string.IsNullOrEmpty(options.OutputFormatId))      // throw new SoftException("No output format specified, so nothing to do!");
 
-        if (options.JustGiveMeDlls && !options.OutputFormatIds.Any())
-            options.OutputFormatIds = new[] { "dummydll" };
+        if (options.JustGiveMeDlls)
+        {
+            Logger.WarnNewline("!!!!!!!!!!You have enabled IL-To-ASM. If this breaks, it breaks.!!!!!!!!!!");
+            Logger.ErrorNewline("!!!!!!!!!!Throwing safety out the window, as you requested! Forget \"If this breaks, it breaks\", this probably WILL break!!!!!!!!!!");
+
+            if (!options.OutputFormatIds.Any())
+                options.OutputFormatIds = new[] { "dll_il_recovery" };
+        }
 
         if (options.OutputFormatIds.Any() == true)
         {

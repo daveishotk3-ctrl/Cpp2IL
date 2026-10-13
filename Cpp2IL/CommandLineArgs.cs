@@ -48,7 +48,7 @@ public class CommandLineArgs
     [Option("output-to", HelpText = "Root directory to output to. Defaults to cpp2il_out in the current working directory.")]
     public string OutputRootDir { get; set; } = Path.GetFullPath("cpp2il_out");
 
-    [Option("just-give-me-dlls-asap-dammit", HelpText = "Legacy shortcut: output dummy DLLs with no processing layers. Equivalent to --output-as dummydll.")]
+    [Option("just-give-me-dlls-asap-dammit", HelpText = "Legacy shortcut from the 2022.0.x releases: output DLLs with recovered IL method bodies. Equivalent to --output-as dll_il_recovery.")]
     public bool JustGiveMeDlls { get; set; }
 
     //Flags
