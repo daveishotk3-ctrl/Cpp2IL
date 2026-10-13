@@ -33,7 +33,11 @@ public static class IlGenerator
             [appContext.SystemTypes.SystemStringType]);
     }
 
-    public static void GenerateIl(MethodAnalysisContext context, MethodDefinition definition)
+    /// <summary>
+    /// Generates IL for the given method.
+    /// </summary>
+    /// <returns>The number of decompiler issue notes that were emitted into the body (0 means the recovered IL is clean).</returns>
+    public static int GenerateIl(MethodAnalysisContext context, MethodDefinition definition)
     {
         var assembly = context.DeclaringType!.DeclaringAssembly;
         var module = definition.DeclaringModule!;
@@ -221,6 +225,9 @@ public static class IlGenerator
             instructions.Add(CilOpCodes.Ldstr, Diagnostic("Warning: " + warning));
             instructions.Add(CilOpCodes.Call, writeLine);
         }
+
+        // Every issue note is a call to the exact same descriptor instance, so reference equality distinguishes them from real calls in the game's code.
+        return instructions.Count(i => ReferenceEquals(i.Operand, writeLine));
     }
 
     // Limit so we don't run into the 16mb limit (see AsmResolver issue #775)

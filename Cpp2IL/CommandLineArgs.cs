@@ -51,6 +51,9 @@ public class CommandLineArgs
     [Option("just-give-me-dlls-asap-dammit", HelpText = "Legacy shortcut from the 2022.0.x releases: output DLLs with recovered IL method bodies. Equivalent to --output-as dll_il_recovery.")]
     public bool JustGiveMeDlls { get; set; }
 
+    [Option("keep-decompiler-issues", HelpText = "With the dll_il_recovery output, keep methods that hit decompiler issues as raw recovered IL (with NoteDecompilerIssue calls and error messages) instead of replacing them with clean stubs.")]
+    public bool KeepDecompilerIssues { get; set; }
+
     //Flags
 
     [Option("verbose", HelpText = "Enable Verbose Logging.")]

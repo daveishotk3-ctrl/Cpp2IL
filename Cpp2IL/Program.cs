@@ -10,6 +10,7 @@ using CommandLine;
 using Cpp2IL.Core;
 using Cpp2IL.Core.Api;
 using Cpp2IL.Core.Logging;
+using Cpp2IL.Core.OutputFormats;
 using Cpp2IL.Core.Utils;
 #if !DEBUG
 using Cpp2IL.Core.Exceptions;
@@ -576,6 +577,9 @@ internal static class Program
             try
             {
                 result.OutputFormats = options.OutputFormatIds.Select(OutputFormatRegistry.GetFormat).ToList();
+
+                foreach (var ilRecovery in result.OutputFormats.OfType<AsmResolverDllOutputFormatIlRecovery>())
+                    ilRecovery.KeepDecompilerIssues = options.KeepDecompilerIssues;
                 Logger.VerboseNewline($"Selected output formats: [{string.Join(", ", options.OutputFormatIds)}]");
             }
             catch (Exception e)

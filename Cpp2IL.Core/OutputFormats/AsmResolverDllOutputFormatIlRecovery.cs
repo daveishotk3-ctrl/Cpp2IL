@@ -22,6 +22,13 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
 
     public override string OutputFormatName => "DLL files with IL Recovery";
 
+    /// <summary>
+    /// If false (the default), methods whose recovered IL contains decompiler issues (unresolved memory loads, missing methods, etc.)
+    /// or which failed to decompile are emitted as clean empty stubs, and no diagnostic helper type or error text is written to the DLLs.
+    /// If true, the raw recovered IL is kept along with NoteDecompilerIssue calls and error-message bodies.
+    /// </summary>
+    public bool KeepDecompilerIssues { get; set; }
+
     public override List<AssemblyDefinition> BuildAssemblies(ApplicationAnalysisContext context)
     {
         //We're going to need key function addresses, so grab them. This way the logging is more consistent
@@ -30,7 +37,8 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
         _ = context.GetOrCreateKeyFunctionAddresses();
         Logger.InfoNewline($"Key function addresses found in {DateTime.Now.Subtract(start).TotalMilliseconds}ms");
 
-        IlGenerator.InjectHelpersType(context);
+        if (KeepDecompilerIssues)
+            IlGenerator.InjectHelpersType(context);
 
         return base.BuildAssemblies(context);
     }
@@ -63,8 +71,8 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
 
             if (methodContext.ConvertedIsil.Count == 0)
                 FillMethodBodyWithStub(methodDefinition);
-            else
-                IlGenerator.GenerateIl(methodContext, methodDefinition);
+            else if (IlGenerator.GenerateIl(methodContext, methodDefinition) > 0 && !KeepDecompilerIssues)
+                FillMethodBodyWithStub(methodDefinition); //Recovered IL is incomplete/garbage - emit a clean stub instead of a body full of placeholders
 
             //WriteControlFlowGraph(methodContext, Path.Combine(Environment.CurrentDirectory, "Cpp2IL", "bin", "Debug", "net9.0", "cpp2il_out", "cfg"));
 
@@ -84,6 +92,13 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
             else
                 Logger.ErrorNewline($"Decompiling {methodContext.FullName} failed: {detail}");
             
+            if (!KeepDecompilerIssues)
+            {
+                FillMethodBodyWithStub(methodDefinition);
+                methodContext.ReleaseAnalysisData();
+                return;
+            }
+
             methodDefinition.CilMethodBody = new();
             instructions = methodDefinition.CilMethodBody.Instructions;
 
