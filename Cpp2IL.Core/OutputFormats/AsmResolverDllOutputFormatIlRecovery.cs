@@ -24,9 +24,9 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
     public override string OutputFormatName => "DLL files with IL Recovery";
 
     /// <summary>
-    /// If false (the default), methods whose recovered IL contains decompiler issues (unresolved memory loads, missing methods, etc.)
-    /// or which failed to decompile are emitted as clean empty stubs, and no diagnostic helper type or error text is written to the DLLs.
-    /// If true, the raw recovered IL is kept along with NoteDecompilerIssue calls and error-message bodies.
+    /// If false (the default), the best-effort recovered IL is kept for every method but the decompiler issue notes
+    /// (NoteDecompilerIssue calls) are stripped, no diagnostic helper type is injected, and methods that fail outright get a clean stub instead of an error-message body.
+    /// If true, the notes and error-message bodies are kept in the output.
     /// </summary>
     public bool KeepDecompilerIssues { get; set; }
 
@@ -78,8 +78,8 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
 
             if (methodContext.ConvertedIsil.Count == 0)
                 FillMethodBodyWithStub(methodDefinition);
-            else if (IlGenerator.GenerateIl(methodContext, methodDefinition) > 0 && !KeepDecompilerIssues)
-                FillMethodBodyWithStub(methodDefinition); //Recovered IL is incomplete/garbage - emit a clean stub instead of a body full of placeholders
+            else
+                IlGenerator.GenerateIl(methodContext, methodDefinition, stripIssueNotes: !KeepDecompilerIssues); //Best-effort IL is always kept; the issue notes are only left in if requested
 
             //WriteControlFlowGraph(methodContext, Path.Combine(Environment.CurrentDirectory, "Cpp2IL", "bin", "Debug", "net9.0", "cpp2il_out", "cfg"));
 

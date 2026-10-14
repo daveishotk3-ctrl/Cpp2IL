@@ -36,8 +36,9 @@ public static class IlGenerator
     /// <summary>
     /// Generates IL for the given method.
     /// </summary>
+    /// <param name="stripIssueNotes">If true, the issue notes are turned into nops so the body keeps the best-effort recovered code without the noise.</param>
     /// <returns>The number of decompiler issue notes that were emitted into the body (0 means the recovered IL is clean).</returns>
-    public static int GenerateIl(MethodAnalysisContext context, MethodDefinition definition)
+    public static int GenerateIl(MethodAnalysisContext context, MethodDefinition definition, bool stripIssueNotes = false)
     {
         var assembly = context.DeclaringType!.DeclaringAssembly;
         var module = definition.DeclaringModule!;
@@ -227,7 +228,25 @@ public static class IlGenerator
         }
 
         // Every issue note is a call to the exact same descriptor instance, so reference equality distinguishes them from real calls in the game's code.
-        return instructions.Count(i => ReferenceEquals(i.Operand, writeLine));
+        var issueCount = instructions.Count(i => ReferenceEquals(i.Operand, writeLine));
+
+        if (stripIssueNotes)
+        {
+            // Each note is "ldstr <message>; call <note method>" and is stack-neutral, so nop-ing both out keeps the IL valid
+            // (and any branch that targets the ldstr still has a valid target).
+            for (var i = 1; i < instructions.Count; i++)
+            {
+                if (instructions[i].OpCode != CilOpCodes.Call || !ReferenceEquals(instructions[i].Operand, writeLine) || instructions[i - 1].OpCode != CilOpCodes.Ldstr)
+                    continue;
+
+                instructions[i - 1].OpCode = CilOpCodes.Nop;
+                instructions[i - 1].Operand = null;
+                instructions[i].OpCode = CilOpCodes.Nop;
+                instructions[i].Operand = null;
+            }
+        }
+
+        return issueCount;
     }
 
     // Limit so we don't run into the 16mb limit (see AsmResolver issue #775)
