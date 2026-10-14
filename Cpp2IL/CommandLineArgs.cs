@@ -54,6 +54,9 @@ public class CommandLineArgs
     [Option("keep-decompiler-issues", HelpText = "With the dll_il_recovery output, keep the NoteDecompilerIssue calls and error-message bodies in the recovered IL instead of stripping them.")]
     public bool KeepDecompilerIssues { get; set; }
 
+    [Option("il-recovery-assemblies", Separator = ',', HelpText = "With the dll_il_recovery output, only recover IL for assemblies whose name starts with one of these comma-separated prefixes (others get clean stubs). Use * for all assemblies. Defaults to Assembly-CSharp when --just-give-me-dlls-asap-dammit is used, otherwise all.")]
+    public IEnumerable<string> IlRecoveryAssemblies { get; set; } = new List<string>();
+
     //Flags
 
     [Option("verbose", HelpText = "Enable Verbose Logging.")]

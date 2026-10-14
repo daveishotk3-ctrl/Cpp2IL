@@ -30,6 +30,12 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
     /// </summary>
     public bool KeepDecompilerIssues { get; set; }
 
+    /// <summary>
+    /// If non-null, IL is only recovered for assemblies whose name starts with one of these prefixes (e.g. "Assembly-CSharp");
+    /// every other assembly gets clean stubs, like a normal dummy DLL. Null recovers all assemblies except Unity's and the BCL.
+    /// </summary>
+    public IReadOnlyCollection<string>? RecoverOnlyAssemblies { get; set; }
+
     public override List<AssemblyDefinition> BuildAssemblies(ApplicationAnalysisContext context)
     {
         //We're going to need key function addresses, so grab them. This way the logging is more consistent
@@ -56,7 +62,8 @@ public class AsmResolverDllOutputFormatIlRecovery : AsmResolverDllOutputFormat
         var moduleName = module.Name!.ToString();
         var shouldSkip = moduleName.StartsWith("UnityEngine.") || moduleName.StartsWith("Unity.") ||
                          moduleName.StartsWith("System.") || moduleName == "System" ||
-                         moduleName.StartsWith("mscorlib");
+                         moduleName.StartsWith("mscorlib")
+                         || RecoverOnlyAssemblies is { } only && !only.Any(prefix => moduleName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
         if (!methodDefinition.IsManagedMethodWithBody())
             return;

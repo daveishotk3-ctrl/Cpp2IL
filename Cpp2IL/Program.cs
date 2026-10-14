@@ -578,8 +578,15 @@ internal static class Program
             {
                 result.OutputFormats = options.OutputFormatIds.Select(OutputFormatRegistry.GetFormat).ToList();
 
+                var recoverOnly = options.IlRecoveryAssemblies.ToList();
+                if (recoverOnly.Count == 0 && options.JustGiveMeDlls)
+                    recoverOnly.Add("Assembly-CSharp"); //Matches the old tool: only the game's own code, not every bundled library
+
                 foreach (var ilRecovery in result.OutputFormats.OfType<AsmResolverDllOutputFormatIlRecovery>())
+                {
                     ilRecovery.KeepDecompilerIssues = options.KeepDecompilerIssues;
+                    ilRecovery.RecoverOnlyAssemblies = recoverOnly.Count == 0 || recoverOnly.Contains("*") ? null : recoverOnly;
+                }
                 Logger.VerboseNewline($"Selected output formats: [{string.Join(", ", options.OutputFormatIds)}]");
             }
             catch (Exception e)
