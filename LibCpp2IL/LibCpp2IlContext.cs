@@ -103,6 +103,10 @@ public sealed class LibCpp2IlContext
             LiteralsByAddress[globalIdentifier.Offset] = globalIdentifier;
     }
 
+    /// <summary>The (exclusive) upper bounds that a decoded metadata usage index must be below to be considered valid, per usage kind.</summary>
+    public (long Types, long Methods, long Fields, long Strings, long MethodSpecs) GetUsageLimits()
+        => (Binary.NumTypes, Metadata.MethodDefinitionCount, Metadata.fieldRefs.Length, Metadata.stringLiterals.Length, Metadata.AllGenericMethodSpecs.Length);
+
     public MetadataUsage? CheckForPost27GlobalAt(ulong address)
     {
         if (!Binary.TryMapVirtualAddressToRaw(address, out var raw) || raw >= Binary.RawLength)

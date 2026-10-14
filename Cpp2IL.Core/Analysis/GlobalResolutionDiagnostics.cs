@@ -140,6 +140,11 @@ public static class GlobalResolutionDiagnostics
                 methodPointers.Add(pointer);
         }
 
+        var limits = appContext.LibCpp2IlContext.GetUsageLimits();
+        var indirectZero = 0;
+        var indirectBadShape = 0; // not an odd 32-bit value, so it doesn't look like an encoded usage
+        var indirectKinds = new SortedDictionary<int, long[]>();
+
         var valueIsType = 0;
         var valueIsMethod = 0;
         var valueBacked = 0;
@@ -162,6 +167,29 @@ public static class GlobalResolutionDiagnostics
 
             valueBacked++;
 
+            if (TryReadPointer(binary, value, out var indirect))
+            {
+                if (indirect == 0)
+                    indirectZero++;
+                else if ((indirect & 1) == 0 || (indirect >> 32) != 0)
+                    indirectBadShape++;
+                else
+                {
+                    var kind = (int)((indirect >> 29) & 7);
+                    var index = (indirect & 0x1FFF_FFFF) >> 1;
+                    var limit = kind switch { 1 or 2 => limits.Types, 3 => limits.Methods, 4 => limits.Fields, 5 => limits.Strings, 6 => limits.MethodSpecs, _ => -1L };
+
+                    if (!indirectKinds.TryGetValue(kind, out var stat))
+                        indirectKinds[kind] = stat = new long[] { 0, long.MaxValue, 0, 0 }; // count, min index, max index, over limit
+
+                    stat[0]++;
+                    stat[1] = Math.Min(stat[1], (long)index);
+                    stat[2] = Math.Max(stat[2], (long)index);
+                    if (limit >= 0 && (long)index >= limit)
+                        stat[3]++;
+                }
+            }
+
             for (var k = 0UL; k <= 0x1F8; k += step)
                 if (binary.TryGetIl2CppTypeFromPointer(value + k, out _))
                     Bump(typeAt, k);
@@ -181,6 +209,9 @@ public static class GlobalResolutionDiagnostics
 
         sb.AppendLine($"  Pointer probe over {slots.Count} non-zero slots ({valueBacked} point into file-backed memory):");
         sb.AppendLine($"    slot value is itself an Il2CppType*: {valueIsType}; is a method pointer: {valueIsMethod}");
+        sb.AppendLine($"    indirect values (*slot): {indirectZero} zero, {indirectBadShape} not shaped like an encoded usage; limits: types {limits.Types}, methods {limits.Methods}, fields {limits.Fields}, strings {limits.Strings}, methodSpecs {limits.MethodSpecs}");
+        foreach (var kind in indirectKinds)
+            sb.AppendLine($"      kind {kind.Key}: {kind.Value[0]} values, index {kind.Value[1]}..{kind.Value[2]}, {kind.Value[3]} at/over limit");
         sb.AppendLine($"    Il2CppType embedded at +offset: {Top(typeAt)}");
         sb.AppendLine($"    Il2CppType* stored at +offset: {Top(typePtrAt)}");
         sb.AppendLine($"    method pointer stored at +offset: {Top(methodPtrAt)}");
