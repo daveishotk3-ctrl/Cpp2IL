@@ -426,6 +426,10 @@ public abstract class Il2CppBinary(Stream input) : ClassReadingBinaryReader(inpu
     public Il2CppType GetIl2CppTypeFromPointer(ulong pointer)
         => _typesByAddress[pointer];
 
+    /// <summary>Looks up an Il2CppType by the address of its struct in the binary (an exact match against the metadata registration's type pointer table).</summary>
+    public bool TryGetIl2CppTypeFromPointer(ulong pointer, out Il2CppType? type)
+        => _typesByAddress.TryGetValue(pointer, out type);
+
     public int GetFieldOffsetFromIndex(Il2CppVariableWidthIndex<Il2CppTypeDefinition> typeIndex, int fieldIndexInType, Il2CppVariableWidthIndex<Il2CppFieldDefinition> fieldIndex, bool isValueType, bool isStatic)
     {
         try
