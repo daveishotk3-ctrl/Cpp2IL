@@ -246,7 +246,52 @@ public static class IlGenerator
             }
         }
 
+        if (stripIssueNotes)
+            TidyBody(body);
+
         return issueCount;
+    }
+
+    /// <summary>
+    /// Old Cpp2IL only ever emitted the "important" actions and dropped unused locals, which is why its bodies looked tidy.
+    /// This does the equivalent: removes nops (retargeting branches that pointed at them) and locals nothing references.
+    /// </summary>
+    private static void TidyBody(CilMethodBody body)
+    {
+        var instructions = body.Instructions;
+
+        // Remove nops, retargeting labels to the next surviving instruction
+        for (var i = instructions.Count - 1; i >= 0; i--)
+        {
+            if (instructions[i].OpCode != CilOpCodes.Nop)
+                continue;
+
+            if (i + 1 >= instructions.Count)
+                continue; // keep a trailing nop so labels pointing at the end stay valid
+
+            var replacement = instructions[i + 1];
+            foreach (var other in instructions)
+            {
+                if (other.Operand is CilInstructionLabel label && ReferenceEquals(label.Instruction, instructions[i]))
+                    other.Operand = new CilInstructionLabel(replacement);
+            }
+
+            instructions.RemoveAt(i);
+        }
+
+        // Drop locals that no instruction touches
+        var used = new HashSet<CilLocalVariable>();
+        foreach (var instruction in instructions)
+            if (instruction.Operand is CilLocalVariable v)
+                used.Add(v);
+
+        if (used.Count == body.LocalVariables.Count)
+            return;
+
+        // Locals are referenced by object, so removal is safe (indices are recomputed when the body is built)
+        for (var i = body.LocalVariables.Count - 1; i >= 0; i--)
+            if (!used.Contains(body.LocalVariables[i]))
+                body.LocalVariables.RemoveAt(i);
     }
 
     // Limit so we don't run into the 16mb limit (see AsmResolver issue #775)
