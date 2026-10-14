@@ -114,7 +114,9 @@ public static class GlobalResolutionDiagnostics
         AppendPointerProbe(sb, appContext, probeSlots);
         sb.Append("  (Includes any ordinary static-data loads, not only metadata. Send this report along when asking for recovery fixes.)");
 
-        Logger.InfoNewline(sb.ToString(), "Globals");
+        // One summary line by default; the full breakdown (useful when a new Unity version stops resolving) only with --verbose.
+        Logger.InfoNewline($"{Interlocked.Read(ref state.Resolved)} metadata references resolved; {unresolved.Length} distinct addresses left unresolved (mostly constants and init flags). Use --verbose for a detailed report.", "Globals");
+        Logger.VerboseNewline(sb.ToString(), "Globals");
     }
 
     /// <summary>
