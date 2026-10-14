@@ -111,10 +111,40 @@ public sealed class LibCpp2IlContext
         var encoded = Binary.ReadPointerAtVirtualAddress(address);
         var metadataUsage = MetadataUsage.DecodeMetadataUsage(encoded, address, this);
 
-        if (metadataUsage?.IsValid != true)
+        if (metadataUsage?.IsValid == true)
+            return metadataUsage;
+
+        return CheckForIndirectGlobalAt(address, encoded);
+    }
+
+    /// <summary>
+    /// Unity 6000.3 (metadata v38+) stores a pointer in each global slot, pointing at an entry in a table of encoded usages
+    /// (kind in the top 3 bits, index shifted left by one, low bit set), instead of storing the encoded value in the slot itself.
+    /// The pointed-to value must look like an encoded usage (low bit set, nothing above bit 31) and decode to a valid usage to be accepted.
+    /// </summary>
+    private MetadataUsage? CheckForIndirectGlobalAt(ulong slotAddress, ulong pointer)
+    {
+        if (Metadata.MetadataVersion < 27f || pointer == 0)
             return null;
 
-        return metadataUsage;
+        try
+        {
+            if (!Binary.TryMapVirtualAddressToRaw(pointer, out var raw) || raw >= Binary.RawLength)
+                return null;
+
+            var indirect = Binary.ReadPointerAtVirtualAddress(pointer);
+
+            if ((indirect & 1) == 0 || (indirect >> 32) != 0)
+                return null;
+
+            var usage = MetadataUsage.DecodeMetadataUsage(indirect, slotAddress, this);
+
+            return usage?.IsValid == true ? usage : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public MetadataUsage? GetAnyGlobalByAddress(ulong address)

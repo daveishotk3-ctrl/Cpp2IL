@@ -83,8 +83,8 @@ public static class MetadataResolver
                 _ => 0ul,
             };
 
-            // Tiny values are ordinary constants (e.g. "mov x0, #1"), not addresses of metadata globals.
-            if (address < MinimumGlobalAddress)
+            // Tiny values and -1 are ordinary constants (e.g. "mov x0, #1"), not addresses of metadata globals.
+            if (address < MinimumGlobalAddress || address is uint.MaxValue or ulong.MaxValue)
                 continue;
 
             if (TryResolveMetadataGlobal(method, instruction, address))
@@ -136,39 +136,7 @@ public static class MetadataResolver
             return true;
         }
 
-        // Unity 6000.3+ (metadata v38+): the slot can hold a direct pointer to an Il2CppType struct instead of an encoded index.
-        // Only exact matches against the binary's own type pointer table are accepted, so this can't misresolve unrelated data.
-        if (method.AppContext.MetadataVersion >= 27f
-            && method.DeclaringType is { } pointerOwner
-            && TryReadSlotPointer(method.AppContext, address, out var slotValue)
-            && method.AppContext.Binary.TryGetIl2CppTypeFromPointer(slotValue, out var pointedType)
-            && pointedType != null
-            && pointerOwner.AppContext.ResolveIl2CppType(pointedType) is { } pointedTypeContext)
-        {
-            instruction.SetOperand(1, pointedTypeContext);
-            return true;
-        }
-
         return false;
-    }
-
-    private static bool TryReadSlotPointer(ApplicationAnalysisContext appContext, ulong address, out ulong value)
-    {
-        value = 0;
-        var binary = appContext.Binary;
-
-        if (!binary.TryMapVirtualAddressToRaw(address, out var raw) || raw >= binary.RawLength)
-            return false;
-
-        try
-        {
-            value = binary.ReadPointerAtVirtualAddress(address);
-            return value != 0;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     /// <summary>
